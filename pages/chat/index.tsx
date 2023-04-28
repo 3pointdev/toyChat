@@ -1,15 +1,26 @@
+import axios from "axios";
 import React, { useEffect, useState } from "react";
 import io from "socket.io-client";
 
-const ChatPage = () => {
+export async function getStaticProps() {
+  const res = await axios.get("http://localhost:3000/messages");
+  const messages = res.data;
+  return {
+    props: {
+      messages,
+    },
+  };
+}
+
+const ChatPage = (props) => {
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState(props.messages);
   const [socket, setSocket] = useState(null);
-
+  const name = "user";
   useEffect(() => {
-    const newSocket = io("http://localhost:8080");
+    const newSocket = io("http://localhost:3000");
     setSocket(newSocket);
-
+    console.log(props);
     return () => {
       newSocket.disconnect();
     };
@@ -17,8 +28,11 @@ const ChatPage = () => {
 
   useEffect(() => {
     if (socket) {
-      socket.on("message", (message: string) => {
-        setMessages((prevMessages) => [...prevMessages, message]);
+      socket.on("chat message", (message: string) => {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          { sender: name, message: message, timestamp: Date.now() },
+        ]);
       });
     }
   }, [socket]);
@@ -26,7 +40,7 @@ const ChatPage = () => {
   const handleMessageSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (socket) {
-      socket.emit("message", message);
+      socket.emit("chat message", message);
       setMessage("");
     }
   };
@@ -35,7 +49,19 @@ const ChatPage = () => {
     <div>
       <ul>
         {messages.map((msg, idx) => (
-          <li key={idx}>{msg}</li>
+          <li
+            key={idx}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              margin: "16px",
+            }}
+          >
+            <span>{`${msg.sender}   :   `}</span>
+            <span>{msg.message}</span>
+            <p>{new Date(msg.timestamp).toLocaleString()}</p>
+          </li>
         ))}
       </ul>
       <form onSubmit={handleMessageSubmit}>
